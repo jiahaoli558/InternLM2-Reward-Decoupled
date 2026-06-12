@@ -49,20 +49,17 @@ class DecoupledRewardHead(nn.Module):
         self.up_dim = up_dim
         
         self.rms1 = RMSNorm(hidden_dim, eps=1e-6) 
-        self.w_up = nn.Linear(hidden_dim, up_dim, bias=False)  # 纯线性高维超空间投影
+        self.w_up = nn.Linear(hidden_dim, up_dim, bias=False) 
         self.rms2 = RMSNorm(up_dim, eps=1e-6) 
         self.w_score = nn.Linear(up_dim, 1, bias=False)
         
-        # 谨慎初始化：正交初始化控益，标量输出压制标准差
         nn.init.orthogonal_(self.w_up.weight, gain=0.01)
         nn.init.normal_(self.w_score.weight, std=0.00001)
 
     def forward(self, x):
         x = self.rms1(x)
-        x = self.w_up(x)   # 空间流形纯线性展开
+        x = self.w_up(x)   
         x = self.rms2(x)
-        
-        # 【核心修正】：除以 sqrt(up_dim) 抵消高维空间相乘的规模爆炸
         score = self.w_score(x) / (self.up_dim ** 0.5)
         return torch.clamp(score, min=-10.0, max=10.0)
 
